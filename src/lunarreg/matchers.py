@@ -2,7 +2,6 @@ import cv2 as cv
 import numpy as np
 
 def ratioTest(knnMatches, ratio):
-    #print(len(knnMatches))
     return list(filter(lambda match: match[0].distance <= match[1].distance*ratio, knnMatches))
 
 def symmetryTest(knnMatchesA, knnMatchesB):
@@ -23,10 +22,9 @@ class BFMatcher:
         # Ratio test using 2 nearest neighbors
         ratio = 0.65
         knnMatchesA = ratioTest(self.bf.knnMatch(desA, desB, 2), ratio)
-        #print(len(knnMatchesA))
         knnMatchesB = ratioTest(self.bf.knnMatch(desB, desA, 2), ratio)
-        #print(len(knnMatchesB))
+
+        # Symmetry test
         matches = symmetryTest(knnMatchesA, knnMatchesB)
-        #print(len(matches))
 
         return matches
