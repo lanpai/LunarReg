@@ -22,14 +22,14 @@ class IterativeFBM:
         self.detector = detector
         self.matcher = matcher
         self.maxIterations = 10
-        self.hmgTolerance = 1.5
+        self.reprojTolerance = 1.5
 
     def reprojTest(self, ptA, ptB, homography):
         ptA = np.array(ptA)
         ptB = np.array(ptB)
 
         dPt = ptA - ptB
-        maxSqr = self.hmgTolerance*self.hmgTolerance
+        maxSqr = self.reprojTolerance*self.reprojTolerance
         distSqr = dPt[0]*dPt[0] + dPt[1]*dPt[1]
 
         return not dPt[0]*dPt[0] + dPt[1]*dPt[1] > maxSqr
@@ -46,39 +46,39 @@ class IterativeFBM:
         # Initialize data
         kpB, desB = self.detector.detect(imB)
 
-        homography = np.identity(3)
-        chaoticMatches = []
+        chaoticHomography = np.identity(3)
+        orderlyHomography = np.identity(3)
         orderlyKeypoints = []
         orderlyDescriptors = []
         orderlyMatches = []
 
         # Iteration
         i = 1
-        self.maxIterations = 50
+        self.maxIterations = 500
         while i <= self.maxIterations:
             print(f'Iteration: {i}')
 
             # Chaotic step
-            imAprime = cv.warpPerspective(imA, homography, imA.shape[:-1][::-1])
+            imAprime = cv.warpPerspective(imA, chaoticHomography, imA.shape[:-1][::-1])
             kpAprime, desAprime = self.detector.detect(imAprime)
             matches = self.matcher.match(desAprime, desB)
 
-            # Find homography
+            # Find chaotic homography
             ptsA, ptsB = [], []
             for match in matches:
                 ptsA.append(kpAprime[match.queryIdx].pt)
                 ptsB.append(kpB[match.trainIdx].pt)
-
             M, mask = cv.findHomography(np.array(ptsA), np.array(ptsB), cv.RANSAC, 3.)
-            homography = M.dot(homography)
-            print(M)
-            print(homography)
+            chaoticHomography = M.dot(chaoticHomography)
+            #print(M)
+            #print(chaoticHomography)
 
-            # Test points against homography
+            # Test points against chaotic homography reprojection
             matches = list(filter(lambda match:
-                self.reprojTest(kpAprime[match.queryIdx].pt, kpB[match.trainIdx].pt, homography), matches))
+                self.reprojTest(
+                    kpAprime[match.queryIdx].pt, kpB[match.trainIdx].pt, chaoticHomography), matches))
 
-            # TODO: Redundancy check
+            # TODO: Redundancy check using hmg tolerance
 
             for match in matches:
                 orderlyMatches.append(cv.DMatch(
@@ -95,9 +95,23 @@ class IterativeFBM:
             for kp in kpAprime:
                 # Invert keypoints to original image space
                 pt = [kp.pt[0], kp.pt[1], 1.]
-                kp.pt = tuple(np.dot(np.linalg.inv(homography), pt)[:-1])
+                kp.pt = tuple(np.dot(np.linalg.inv(chaoticHomography), pt)[:-1])
             orderlyKeypoints = orderlyKeypoints + list(kpAprime)
             orderlyDescriptors = orderlyDescriptors + list(desAprime)
+
+            if len(orderlyMatches) > 0:
+                # Find orderly homography
+                ptsA, ptsB = [], []
+                for match in orderlyMatches:
+                    ptsA.append(orderlyKeypoints[match.queryIdx].pt)
+                    ptsB.append(kpB[match.trainIdx].pt)
+                orderlyHomography, mask = cv.findHomography(np.array(ptsA), np.array(ptsB), cv.RANSAC, 3.)
+
+                # Test points against orderly homography reprojection
+                matches = list(filter(lambda match:
+                    self.reprojTest(
+                        orderlyKeypoints[match.queryIdx].pt, kpB[match.trainIdx].pt, orderlyHomography),
+                        orderlyMatches))
 
             i = i + 1
 
