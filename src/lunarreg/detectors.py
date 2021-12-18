@@ -3,7 +3,7 @@ import cv2 as cv
 class SIFTDetector:
     def __init__(self):
         nFeatures = 0
-        nOctaveLayers = 3
+        nOctaveLayers = 4
         contrastThreshold = 0.04
         edgeThreshold = 10
         sigma = 1.6

@@ -1,7 +1,7 @@
 import cv2 as cv
 import numpy as np
 
-import matplotlib.pyplot as plt
+#import matplotlib.pyplot as plt
 
 def colorTransfer(source, dest):
     source_gray = cv.cvtColor(source, cv.COLOR_BGR2GRAY)
@@ -21,8 +21,9 @@ class IterativeFBM:
     def __init__(self, detector, matcher):
         self.detector = detector
         self.matcher = matcher
-        self.maxIterations = 10
+        self.maxIterations = 15
         self.reprojTolerance = 1.5
+        self.redundancyTolerance = 3.
 
     def reprojTest(self, ptA, ptB, homography):
         ptA = np.array(ptA)
@@ -32,7 +33,7 @@ class IterativeFBM:
         maxSqr = self.reprojTolerance*self.reprojTolerance
         distSqr = dPt[0]*dPt[0] + dPt[1]*dPt[1]
 
-        return not dPt[0]*dPt[0] + dPt[1]*dPt[1] > maxSqr
+        return not distSqr > maxSqr
 
     def match(self, imA, imB):
         # Color transfer
@@ -54,9 +55,8 @@ class IterativeFBM:
 
         # Iteration
         i = 1
-        self.maxIterations = 500
         while i <= self.maxIterations:
-            print(f'Iteration: {i}')
+            #print(f'Iteration: {i}')
 
             # Chaotic step
             imAprime = cv.warpPerspective(imA, chaoticHomography, imA.shape[:-1][::-1])
@@ -65,6 +65,8 @@ class IterativeFBM:
 
             # Find chaotic homography
             ptsA, ptsB = [], []
+            if len(matches) < 8:
+                raise Exception('Less than 8 matches found for homography!')
             for match in matches:
                 ptsA.append(kpAprime[match.queryIdx].pt)
                 ptsB.append(kpB[match.trainIdx].pt)
@@ -78,11 +80,35 @@ class IterativeFBM:
                 self.reprojTest(
                     kpAprime[match.queryIdx].pt, kpB[match.trainIdx].pt, chaoticHomography), matches))
 
-            # TODO: Redundancy check using hmg tolerance
+            # Redundancy check
+            for match1 in matches:
+                shouldAppend = True
+                pt1 = np.array(kpAprime[match1.queryIdx].pt)
+                for j, match2 in enumerate(orderlyMatches):
+                    # Don't check recently appended matches
+                    if match2.queryIdx >= len(orderlyKeypoints):
+                        break
 
-            for match in matches:
-                orderlyMatches.append(cv.DMatch(
-                    match.queryIdx + len(orderlyKeypoints), match.trainIdx, match.distance))
+                    pt2 = np.array(orderlyKeypoints[match2.queryIdx].pt)
+
+                    dPt = pt1 - pt2
+                    maxSqr = self.redundancyTolerance*self.redundancyTolerance
+                    distSqr = dPt[0]*dPt[0] + dPt[1]*dPt[1]
+
+                    if distSqr <= maxSqr:
+                        if match1.distance < match2.distance:
+                            orderlyMatches.pop(j)
+                            shouldAppend = True
+                        else:
+                            shouldAppend = False
+                        break
+
+                if shouldAppend:
+                    orderlyMatches.append(cv.DMatch(
+                        match1.queryIdx + len(orderlyKeypoints), match1.trainIdx, match1.distance))
+
+            #print('Iteration matches: \t', len(matches))
+            #print('Cumulative matches:\t', len(orderlyMatches))
 
             # Debug plot (chaotic)
             #imMatch = cv.drawMatches(
@@ -119,5 +145,10 @@ class IterativeFBM:
         imMatch = cv.drawMatches(
                 imA, orderlyKeypoints, imB, kpB, orderlyMatches, None,
                 flags=cv.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS)
-        plt.imshow(imMatch)
-        plt.show()
+        #plt.imshow(imMatch)
+        #plt.show()
+
+        return (chaoticHomography, orderlyHomography,
+                orderlyKeypoints, orderlyDescriptors,
+                kpB, desB,
+                orderlyMatches, i, imMatch)

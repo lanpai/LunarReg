@@ -17,12 +17,12 @@ class BFMatcher:
         normType = cv.NORM_L2
         crossCheck = False
         self.bf = cv.BFMatcher(normType, crossCheck=crossCheck)
+        self.ratio = 0.65
 
     def match(self, desA, desB):
         # Ratio test using 2 nearest neighbors
-        ratio = 0.65
-        knnMatchesA = ratioTest(self.bf.knnMatch(desA, desB, 2), ratio)
-        knnMatchesB = ratioTest(self.bf.knnMatch(desB, desA, 2), ratio)
+        knnMatchesA = ratioTest(self.bf.knnMatch(desA, desB, 2), self.ratio)
+        knnMatchesB = ratioTest(self.bf.knnMatch(desB, desA, 2), self.ratio)
 
         # Symmetry test
         matches = symmetryTest(knnMatchesA, knnMatchesB)
