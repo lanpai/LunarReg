@@ -64,9 +64,8 @@ class IterativeFBM:
             matches = self.matcher.match(desAprime, desB)
 
             # Find chaotic homography
+            assert len(matches) > 0, 'No matches found for homography!'
             ptsA, ptsB = [], []
-            #if len(matches) < 8:
-            #    raise Exception('Less than 8 matches found for homography!')
             for match in matches:
                 ptsA.append(kpAprime[match.queryIdx].pt)
                 ptsB.append(kpB[match.trainIdx].pt)
@@ -75,8 +74,6 @@ class IterativeFBM:
             except:
                 M, mask = cv.findHomography(np.array(ptsA), np.array(ptsB)) # Default to least-squares
             chaoticHomography = M.dot(chaoticHomography)
-            #print(M)
-            #print(chaoticHomography)
 
             # Test points against chaotic homography reprojection
             matches = list(filter(lambda match:
@@ -110,16 +107,6 @@ class IterativeFBM:
                     orderlyMatches.append(cv.DMatch(
                         match1.queryIdx + len(orderlyKeypoints), match1.trainIdx, match1.distance))
 
-            #print('Iteration matches: \t', len(matches))
-            #print('Cumulative matches:\t', len(orderlyMatches))
-
-            # Debug plot (chaotic)
-            #imMatch = cv.drawMatches(
-            #        imAprime, kpAprime, imB, kpB, matches, None,
-            #        flags=cv.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS)
-            #plt.imshow(imMatch)
-            #plt.show()
-
             # Append chaotic data
             for kp in kpAprime:
                 # Invert keypoints to original image space
@@ -130,6 +117,7 @@ class IterativeFBM:
 
             if len(orderlyMatches) > 0:
                 # Find orderly homography
+                assert len(orderlyMatches) > 0, 'No matches found for homography!'
                 ptsA, ptsB = [], []
                 for match in orderlyMatches:
                     ptsA.append(orderlyKeypoints[match.queryIdx].pt)
@@ -151,8 +139,6 @@ class IterativeFBM:
         imMatch = cv.drawMatches(
                 imA, orderlyKeypoints, imB, kpB, orderlyMatches, None,
                 flags=cv.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS)
-        #plt.imshow(imMatch)
-        #plt.show()
 
         return (chaoticHomography, orderlyHomography,
                 orderlyKeypoints, orderlyDescriptors,
