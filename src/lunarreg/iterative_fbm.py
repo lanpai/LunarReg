@@ -64,7 +64,7 @@ class IterativeFBM:
             matches = self.matcher.match(desAprime, desB)
 
             # Find chaotic homography
-            assert len(matches) > 0, 'No matches found for homography!'
+            assert len(matches) >= 4, 'Less than 4 matches found for homography!'
             ptsA, ptsB = [], []
             for match in matches:
                 ptsA.append(kpAprime[match.queryIdx].pt)
@@ -117,7 +117,7 @@ class IterativeFBM:
 
             if len(orderlyMatches) > 0:
                 # Find orderly homography
-                assert len(orderlyMatches) > 0, 'No matches found for homography!'
+                assert len(orderlyMatches) >= 4, 'Less than 4 matches found for homography!'
                 ptsA, ptsB = [], []
                 for match in orderlyMatches:
                     ptsA.append(orderlyKeypoints[match.queryIdx].pt)
