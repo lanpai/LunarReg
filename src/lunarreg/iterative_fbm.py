@@ -72,7 +72,10 @@ class IterativeFBM:
             try:
                 M, mask = cv.findHomography(np.array(ptsA), np.array(ptsB), cv.RANSAC, 3.)
             except:
-                M, mask = cv.findHomography(np.array(ptsA), np.array(ptsB)) # Default to least-squares
+                try:
+                    M, mask = cv.findHomography(np.array(ptsA), np.array(ptsB)) # Default to least-squares
+                except:
+                    if i > 1: break
             chaoticHomography = M.dot(chaoticHomography)
 
             # Test points against chaotic homography reprojection
@@ -125,7 +128,10 @@ class IterativeFBM:
                 try:
                     orderlyHomography, mask = cv.findHomography(np.array(ptsA), np.array(ptsB), cv.RANSAC, 3.)
                 except:
-                    orderlyHomography, mask = cv.findHomography(np.array(ptsA), np.array(ptsB)) # Default to least-squares
+                    try:
+                        orderlyHomography, mask = cv.findHomography(np.array(ptsA), np.array(ptsB)) # Default to least-squares
+                    except:
+                        if i > 1: break
 
                 # Test points against orderly homography reprojection
                 matches = list(filter(lambda match:
