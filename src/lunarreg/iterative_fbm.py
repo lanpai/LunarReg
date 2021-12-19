@@ -65,12 +65,15 @@ class IterativeFBM:
 
             # Find chaotic homography
             ptsA, ptsB = [], []
-            if len(matches) < 8:
-                raise Exception('Less than 8 matches found for homography!')
+            #if len(matches) < 8:
+            #    raise Exception('Less than 8 matches found for homography!')
             for match in matches:
                 ptsA.append(kpAprime[match.queryIdx].pt)
                 ptsB.append(kpB[match.trainIdx].pt)
-            M, mask = cv.findHomography(np.array(ptsA), np.array(ptsB), cv.RANSAC, 3.)
+            try:
+                M, mask = cv.findHomography(np.array(ptsA), np.array(ptsB), cv.RANSAC, 3.)
+            except:
+                M, mask = cv.findHomography(np.array(ptsA), np.array(ptsB)) # Default to least-squares
             chaoticHomography = M.dot(chaoticHomography)
             #print(M)
             #print(chaoticHomography)
@@ -131,7 +134,10 @@ class IterativeFBM:
                 for match in orderlyMatches:
                     ptsA.append(orderlyKeypoints[match.queryIdx].pt)
                     ptsB.append(kpB[match.trainIdx].pt)
-                orderlyHomography, mask = cv.findHomography(np.array(ptsA), np.array(ptsB), cv.RANSAC, 3.)
+                try:
+                    orderlyHomography, mask = cv.findHomography(np.array(ptsA), np.array(ptsB), cv.RANSAC, 3.)
+                except:
+                    orderlyHomography, mask = cv.findHomography(np.array(ptsA), np.array(ptsB)) # Default to least-squares
 
                 # Test points against orderly homography reprojection
                 matches = list(filter(lambda match:
