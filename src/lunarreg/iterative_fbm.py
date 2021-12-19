@@ -64,7 +64,6 @@ class IterativeFBM:
             matches = self.matcher.match(desAprime, desB)
 
             # Find chaotic homography
-            assert len(matches) >= 4, 'Less than 4 matches found for homography!'
             ptsA, ptsB = [], []
             for match in matches:
                 ptsA.append(kpAprime[match.queryIdx].pt)
@@ -74,8 +73,9 @@ class IterativeFBM:
             except:
                 try:
                     M, mask = cv.findHomography(np.array(ptsA), np.array(ptsB)) # Default to least-squares
-                except:
+                except Exception as e:
                     if i > 1: break
+                    raise e
             chaoticHomography = M.dot(chaoticHomography)
 
             # Test points against chaotic homography reprojection
@@ -120,7 +120,6 @@ class IterativeFBM:
 
             if len(orderlyMatches) > 0:
                 # Find orderly homography
-                assert len(orderlyMatches) >= 4, 'Less than 4 matches found for homography!'
                 ptsA, ptsB = [], []
                 for match in orderlyMatches:
                     ptsA.append(orderlyKeypoints[match.queryIdx].pt)
@@ -130,8 +129,9 @@ class IterativeFBM:
                 except:
                     try:
                         orderlyHomography, mask = cv.findHomography(np.array(ptsA), np.array(ptsB)) # Default to least-squares
-                    except:
+                    except Exception as e:
                         if i > 1: break
+                        raise e
 
                 # Test points against orderly homography reprojection
                 matches = list(filter(lambda match:
