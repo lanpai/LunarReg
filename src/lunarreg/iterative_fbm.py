@@ -26,14 +26,14 @@ class IterativeFBM:
         self.redundancyTolerance = 3.
 
     def reprojTest(self, ptA, ptB, homography):
-        ptA = np.array(ptA)
+        ptA = np.dot(homography, np.array((*ptA, 1.)))[:-1]
         ptB = np.array(ptB)
 
         dPt = ptA - ptB
         maxSqr = self.reprojTolerance*self.reprojTolerance
         distSqr = dPt[0]*dPt[0] + dPt[1]*dPt[1]
 
-        return not distSqr > maxSqr
+        return distSqr <= maxSqr
 
     def match(self, imA, imB):
         # Color transfer
@@ -80,7 +80,7 @@ class IterativeFBM:
             # Test points against chaotic homography reprojection
             matches = list(filter(lambda match:
                 self.reprojTest(
-                    kpAprime[match.queryIdx].pt, kpB[match.trainIdx].pt, chaoticHomography), matches))
+                    kpAprime[match.queryIdx].pt, kpB[match.trainIdx].pt, M), matches))
 
             # Redundancy check
             for match1 in matches:
