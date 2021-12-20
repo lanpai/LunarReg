@@ -75,6 +75,7 @@ class IterativeFBM:
                     if i > 1: break
                     assert len(ptsA) >= 4, 'Less than 4 matches found for homography!'
                     raise e
+            prevChaoticHomography = chaoticHomography.copy()
             chaoticHomography = M.dot(chaoticHomography)
 
             # Test points against chaotic homography reprojection
@@ -113,7 +114,7 @@ class IterativeFBM:
             for kp in kpAprime:
                 # Invert keypoints to original image space
                 pt = [kp.pt[0], kp.pt[1], 1.]
-                kp.pt = tuple(np.dot(np.linalg.inv(chaoticHomography), pt)[:-1])
+                kp.pt = tuple(np.dot(np.linalg.inv(prevChaoticHomography), pt)[:-1])
             orderlyKeypoints = orderlyKeypoints + list(kpAprime)
             orderlyDescriptors = orderlyDescriptors + list(desAprime)
 
