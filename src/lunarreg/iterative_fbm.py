@@ -56,8 +56,6 @@ class IterativeFBM:
         # Iteration
         i = 1
         while i <= self.maxIterations:
-            #print(f'Iteration: {i}')
-
             # Chaotic step
             imAprime = cv.warpPerspective(imA, chaoticHomography, imA.shape[:-1][::-1])
             kpAprime, desAprime = self.detector.detect(imAprime)
