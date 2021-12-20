@@ -75,6 +75,7 @@ class IterativeFBM:
                     M, mask = cv.findHomography(np.array(ptsA), np.array(ptsB)) # Default to least-squares
                 except Exception as e:
                     if i > 1: break
+                    assert len(ptsA) >= 4, 'Less than 4 matches found for homography!'
                     raise e
             chaoticHomography = M.dot(chaoticHomography)
 
@@ -131,6 +132,7 @@ class IterativeFBM:
                         orderlyHomography, mask = cv.findHomography(np.array(ptsA), np.array(ptsB)) # Default to least-squares
                     except Exception as e:
                         if i > 1: break
+                        assert len(ptsA) >= 4, 'Less than 4 matches found for homography!'
                         raise e
 
                 # Test points against orderly homography reprojection
@@ -140,6 +142,8 @@ class IterativeFBM:
                         orderlyMatches))
 
             i = i + 1
+
+        assert len(orderlyMatches) > 0, 'No matches found during iterative FBM!'
 
         # Debug plot (orderly)
         imMatch = cv.drawMatches(
