@@ -26,7 +26,10 @@ class IterativeFBM:
         self.redundancyTolerance = 3.
 
     def reprojTest(self, ptA, ptB, homography):
-        ptA = np.dot(homography, np.array((*ptA, 1.)))[:-1]
+        ptA = cv.perspectiveTransform(
+                np.array([[ptA]], dtype=np.float64),
+                homography
+                )[0,0]
         ptB = np.array(ptB)
 
         dPt = ptA - ptB
@@ -113,8 +116,11 @@ class IterativeFBM:
             # Append chaotic data
             for kp in kpAprime:
                 # Invert keypoints to original image space
-                pt = [kp.pt[0], kp.pt[1], 1.]
-                kp.pt = tuple(np.dot(np.linalg.inv(prevChaoticHomography), pt)[:-1])
+                kp.pt = tuple(
+                        cv.perspectiveTransform(
+                            np.array([[kp.pt]], dtype=np.float64),
+                            np.linalg.inv(prevChaoticHomography)
+                            )[0,0])
             orderlyKeypoints = orderlyKeypoints + list(kpAprime)
             orderlyDescriptors = orderlyDescriptors + list(desAprime)
 
