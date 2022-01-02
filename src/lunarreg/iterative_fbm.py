@@ -38,6 +38,46 @@ class IterativeFBM:
 
         return distSqr <= maxSqr
 
+    def redundancyCheck(self, matches):
+        uniqueMatches = []
+        for i, matchA in enumerate(matches):
+            isMin = True
+            for j, matchB in enumerate(matches, start=i+1):
+                if matchA.trainIdx == matchB.trainIdx and matchA.distance > matchB.distance:
+                    isMin = False
+                    break
+            if isMin:
+                uniqueMatches.append(matchA)
+        return uniqueMatches
+
+    def step(self, imA, imB, M, kpB, desB):
+        imAprime = cv.warpPerspective(imA, M, imA.shape[:-1][::-1])
+        kpAprime, desAprime = self.detector.detect(imAprime)
+        matches = self.matcher.match(desAprime, desB)
+
+        # Find homography
+        ptsA, ptsB = [], []
+        for match in matches:
+            ptsA.append(kpAprime[match.queryIdx].pt)
+            ptsB.append(kpB[match.trainIdx].pt)
+        try:
+            homography, mask = cv.findHomography(np.array(ptsA), np.array(ptsB), cv.RANSAC, 3.)
+        except:
+            try:
+                homography, mask = cv.findHomography(np.array(ptsA), np.array(ptsB)) # Default to least-squares
+            except Exception as e:
+                assert len(ptsA) >= 4, 'Less than 4 matches found for homography!'
+                raise e
+        M = homography.dot(M)
+
+        # Test points against reprojection
+        matches = list(filter(lambda match:
+            self.reprojTest(
+                kpAprime[match.queryIdx].pt, kpB[match.trainIdx].pt, homography),
+            matches))
+
+        return (M, matches, kpAprime, desAprime)
+
     def match(self, imA, imB):
         # Color transfer
         imA = colorTransfer(imB, imA)
@@ -60,58 +100,19 @@ class IterativeFBM:
         i = 1
         while i <= self.maxIterations:
             # Chaotic step
-            imAprime = cv.warpPerspective(imA, chaoticHomography, imA.shape[:-1][::-1])
-            kpAprime, desAprime = self.detector.detect(imAprime)
-            matches = self.matcher.match(desAprime, desB)
-
-            # Find chaotic homography
-            ptsA, ptsB = [], []
-            for match in matches:
-                ptsA.append(kpAprime[match.queryIdx].pt)
-                ptsB.append(kpB[match.trainIdx].pt)
-            try:
-                M, mask = cv.findHomography(np.array(ptsA), np.array(ptsB), cv.RANSAC, 3.)
-            except:
-                try:
-                    M, mask = cv.findHomography(np.array(ptsA), np.array(ptsB)) # Default to least-squares
-                except Exception as e:
-                    if i > 1: break
-                    assert len(ptsA) >= 4, 'Less than 4 matches found for homography!'
-                    raise e
             prevChaoticHomography = chaoticHomography.copy()
-            chaoticHomography = M.dot(chaoticHomography)
-
-            # Test points against chaotic homography reprojection
-            matches = list(filter(lambda match:
-                self.reprojTest(
-                    kpAprime[match.queryIdx].pt, kpB[match.trainIdx].pt, M), matches))
+            try:
+                (chaoticHomography, chaoticMatches,
+                        kpAprime, desAprime) = self.step(imA, imB, chaoticHomography, kpB, desB)
+            except Exception as e:
+                if i == 1: raise e
+                break
 
             # Redundancy check
-            for match1 in matches:
-                shouldAppend = True
-                pt1 = np.array(kpAprime[match1.queryIdx].pt)
-                for j, match2 in enumerate(orderlyMatches):
-                    # Don't check recently appended matches
-                    if match2.queryIdx >= len(orderlyKeypoints):
-                        break
-
-                    pt2 = np.array(orderlyKeypoints[match2.queryIdx].pt)
-
-                    dPt = pt1 - pt2
-                    maxSqr = self.redundancyTolerance*self.redundancyTolerance
-                    distSqr = dPt[0]*dPt[0] + dPt[1]*dPt[1]
-
-                    if distSqr <= maxSqr:
-                        if match1.distance < match2.distance:
-                            orderlyMatches.pop(j)
-                            shouldAppend = True
-                        else:
-                            shouldAppend = False
-                        break
-
-                if shouldAppend:
-                    orderlyMatches.append(cv.DMatch(
-                        match1.queryIdx + len(orderlyKeypoints), match1.trainIdx, match1.distance))
+            for match in chaoticMatches:
+                orderlyMatches.append(cv.DMatch(
+                    match.queryIdx + len(orderlyKeypoints), match.trainIdx, match.distance))
+            orderlyMatches = self.redundancyCheck(orderlyMatches)
 
             # Append chaotic data
             for kp in kpAprime:
@@ -121,8 +122,10 @@ class IterativeFBM:
                             np.array([[kp.pt]], dtype=np.float64),
                             np.linalg.inv(prevChaoticHomography)
                             )[0,0])
-            orderlyKeypoints = orderlyKeypoints + list(kpAprime)
-            orderlyDescriptors = orderlyDescriptors + list(desAprime)
+            chaoticKeypoints = list(kpAprime)
+            chaoticDescriptors = list(desAprime)
+            orderlyKeypoints = orderlyKeypoints + chaoticKeypoints
+            orderlyDescriptors = orderlyDescriptors + orderlyKeypoints
 
             if len(orderlyMatches) > 0:
                 # Find orderly homography
@@ -140,22 +143,39 @@ class IterativeFBM:
                         assert len(ptsA) >= 4, 'Less than 4 matches found for homography!'
                         raise e
 
-                # Test points against orderly homography reprojection
-                matches = list(filter(lambda match:
-                    self.reprojTest(
-                        orderlyKeypoints[match.queryIdx].pt, kpB[match.trainIdx].pt, orderlyHomography),
-                        orderlyMatches))
+                # Orderly step
+                prevOrderlyHomography = orderlyHomography.copy()
+                try:
+                    (orderlyHomography, newOrderlyMatches,
+                            kpAprime, desAprime) = self.step(imA, imB, orderlyHomography, kpB, desB)
+                except Exception as e:
+                    if i == 1: raise e
+                    break
+
+                # Redundancy check
+                for match in newOrderlyMatches:
+                    orderlyMatches.append(cv.DMatch(
+                        match.queryIdx + len(orderlyKeypoints), match.trainIdx, match.distance))
+                orderlyMatches = self.redundancyCheck(orderlyMatches)
+
+                # Append orderly data
+                for kp in kpAprime:
+                    # Invert keypoints to original image space
+                    kp.pt = tuple(
+                            cv.perspectiveTransform(
+                                np.array([[kp.pt]], dtype=np.float64),
+                                np.linalg.inv(orderlyHomography)
+                                )[0,0])
+                orderlyKeypoints = orderlyKeypoints + list(kpAprime)
+                orderlyDescriptors = orderlyDescriptors + list(desAprime)
 
             i = i + 1
 
         assert len(orderlyMatches) > 0, 'No matches found during iterative FBM!'
 
-        # Debug plot (orderly)
-        imMatch = cv.drawMatches(
-                imA, orderlyKeypoints, imB, kpB, orderlyMatches, None,
-                flags=cv.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS)
-
         return (chaoticHomography, orderlyHomography,
-                orderlyKeypoints, orderlyDescriptors,
+                chaoticKeypoints, orderlyKeypoints,
+                chaoticDescriptors, orderlyDescriptors,
                 kpB, desB,
-                orderlyMatches, i, imMatch)
+                chaoticMatches, orderlyMatches,
+                imA, imB, i)
