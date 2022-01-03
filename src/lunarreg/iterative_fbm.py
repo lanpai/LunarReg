@@ -97,8 +97,10 @@ class IterativeFBM:
         orderlyMatches = []
 
         # Iteration
-        i = 1
+        i = 0
         while i <= self.maxIterations:
+            i = i + 1
+
             # Chaotic step
             prevChaoticHomography = chaoticHomography.copy()
             try:
@@ -168,8 +170,6 @@ class IterativeFBM:
                                 )[0,0])
                 orderlyKeypoints = orderlyKeypoints + list(kpAprime)
                 orderlyDescriptors = orderlyDescriptors + list(desAprime)
-
-            i = i + 1
 
         assert len(orderlyMatches) > 0, 'No matches found during iterative FBM!'
 
