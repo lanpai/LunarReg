@@ -2,9 +2,11 @@ import cv2 as cv
 import numpy as np
 
 def ratioTest(knnMatches, ratio):
+    # Lowe's ratio test to discard insufficiently strong matches
     return list(filter(lambda match: match[0].distance <= match[1].distance*ratio, knnMatches))
 
 def symmetryTest(knnMatchesA, knnMatchesB):
+    # Discard matches that are not symmetric
     matches = []
     for matchA in knnMatchesA:
         for matchB in knnMatchesB:

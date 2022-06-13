@@ -1,9 +1,8 @@
 import cv2 as cv
 import numpy as np
 
-#import matplotlib.pyplot as plt
-
 def colorTransfer(source, dest):
+    # Transfers the tone of source to dest
     source_gray = cv.cvtColor(source, cv.COLOR_BGR2GRAY)
     dest_gray = cv.cvtColor(dest, cv.COLOR_BGR2GRAY)
 
@@ -19,6 +18,7 @@ def colorTransfer(source, dest):
 
 class IterativeFBM:
     def __init__(self, detector, matcher):
+        # Defining FBM parameters
         self.detector = detector
         self.matcher = matcher
         self.maxIterations = 15
@@ -26,6 +26,8 @@ class IterativeFBM:
         self.redundancyTolerance = 3.
 
     def reprojTest(self, ptA, ptB, homography):
+        # Tests the reprojection of ptA to ptB using homography
+        # Returns True if the reprojection is within tolerance of ptB
         ptA = cv.perspectiveTransform(
                 np.array([[ptA]], dtype=np.float64),
                 homography
@@ -39,6 +41,8 @@ class IterativeFBM:
         return distSqr <= maxSqr
 
     def redundancyCheck(self, matches):
+        # Checks if there are redundant matches based off of the match index on the ground truth
+        # Returns the unique matches and retains the best match our of redundant matches
         uniqueMatches = []
         for i, matchA in enumerate(matches):
             isMin = True
@@ -136,10 +140,12 @@ class IterativeFBM:
                     ptsA.append(orderlyKeypoints[match.queryIdx].pt)
                     ptsB.append(kpB[match.trainIdx].pt)
                 try:
+                    # Attempt to use RANSAC
                     orderlyHomography, mask = cv.findHomography(np.array(ptsA), np.array(ptsB), cv.RANSAC, 3.)
                 except:
                     try:
-                        orderlyHomography, mask = cv.findHomography(np.array(ptsA), np.array(ptsB)) # Default to least-squares
+                        # Default to least-squares if there aren't enough points
+                        orderlyHomography, mask = cv.findHomography(np.array(ptsA), np.array(ptsB))
                     except Exception as e:
                         if i > 1: break
                         assert len(ptsA) >= 4, 'Less than 4 matches found for homography!'
