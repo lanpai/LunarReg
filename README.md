@@ -17,3 +17,8 @@ python -m build
 # Install with pip
 pip install dist/<package wheel file>
 ```
+
+## Usage
+
+Currently no CLI tools are available.
+A usage example can be found in `./tests/test.py` along with sample inputs.
